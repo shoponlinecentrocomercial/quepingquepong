@@ -1,0 +1,78 @@
+name: Build Android
+on: [push]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install Dependencies
+        run: |
+          npm install
+          npm install @capacitor/cli @capacitor/core @capacitor/android @capacitor-community/admob @capacitor/assets
+
+      - name: Create www folder
+        run: mkdir -p www && cp index.html www/ 2>/dev/null || true
+
+      - name: Initialize Capacitor Android
+        run: |
+          # Añadimos la plataforma Android desde cero
+          npx cap add android
+          npx cap sync android
+
+      - name: Generate App Icons
+        run: |
+          # Esta herramienta busca automáticamente la carpeta /assets
+          npx capacitor-assets generate --android
+
+      - name: Fix Android Environment (Zipalign & Apksigner)
+        run: |
+          ACTUAL_VERSION=$(ls $ANDROID_HOME/build-tools/ | tail -n 1)
+          sudo mkdir -p /usr/local/lib/android/sdk/build-tools/29.0.3
+          sudo ln -s $ANDROID_HOME/build-tools/$ACTUAL_VERSION/zipalign /usr/local/lib/android/sdk/build-tools/29.0.3/zipalign
+          sudo ln -s $ANDROID_HOME/build-tools/$ACTUAL_VERSION/lib /usr/local/lib/android/sdk/build-tools/29.0.3/lib
+          sudo ln -s $ANDROID_HOME/build-tools/$ACTUAL_VERSION/apksigner /usr/local/lib/android/sdk/build-tools/29.0.3/apksigner
+
+      - name: Configure Android Manifest (AdMob & Permissions)
+        run: |
+          # Inyectar ID de AdMob
+          sed -i '/<\/application>/i <meta-data android:name="com.google.android.gms.ads.APPLICATION_ID" android:value="ca-app-pub-3940256099942544~3347511713"\/>' android/app/src/main/AndroidManifest.xml
+          # Inyectar Permisos de GPS y Sensores
+          #sed -i '/<manifest/a <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />' android/app/src/main/AndroidManifest.xml
+          #sed -i '/<manifest/a <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />' android/app/src/main/AndroidManifest.xml
+          #sed -i '/<manifest/a <uses-feature android:name="android.hardware.sensor.accelerometer" android:required="true" />' android/app/src/main/AndroidManifest.xml
+          #sed -i '/<manifest/a <uses-feature android:name="android.hardware.sensor.compass" android:required="true" />' android/app/src/main/AndroidManifest.xml
+
+      - name: Build APK
+        run: |
+          cd android
+          chmod +x gradlew
+          ./gradlew assembleRelease
+
+      - name: Sign APK
+        id: sign_app
+        uses: r0adkll/sign-android-release@v1
+        with:
+          releaseDirectory: android/app/build/outputs/apk/release
+          signingKeyBase64: ${{ secrets.KEYSTORE_BASE64 }}
+          alias: mi-alias
+          keyStorePassword: ${{ secrets.KEYSTORE_PASSWORD }}
+          keyPassword: ${{ secrets.KEYSTORE_PASSWORD }}
+
+      - name: Upload Finished APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: oldie_billar_v1
+          path: ${{ steps.sign_app.outputs.signedReleaseFile }}
