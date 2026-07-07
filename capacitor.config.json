@@ -1,7 +1,7 @@
 {
   "appId": "com.symphoniertech.quepingquepong",
   "appName": "QuePing QuePong",
-  "webDir": "public",
+  "webDir": "www",
   "backgroundColor": "#141a24",
   "server": {
     "androidScheme": "https"

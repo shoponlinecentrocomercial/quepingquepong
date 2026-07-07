@@ -374,11 +374,26 @@ function tableDef() {
   return Cosmetics.TABLES[t];
 }
 
-function draw(dt) {
-  const T = tableDef();
-  const g = lctx;
-  g.clearRect(0, 0, LW, LH);
+// --- caché de escena estática ---------------------------------------------
+// El fondo del estadio (pared, banderines, público, bandera, suelo, marca) y
+// la mesa con su red se pre-renderizan en canvases: regenerarlos con cientos
+// de fillRect en cada frame era el mayor coste del bucle en móviles, sobre
+// todo en el layout vertical. El público y la bandera tienen una "ola" de dos
+// frames → dos variantes de fondo. La clave (LH + mesa de cosmetics[0])
+// invalida la caché sola al cambiar layout() o los cosméticos.
+let sceneCache = null; // { LH, T, bg: [canvas, canvas], table: canvas }
 
+function sceneCanvases() {
+  const T = tableDef();
+  if (sceneCache && sceneCache.LH === LH && sceneCache.T === T) return sceneCache;
+  const mk = () => { const c = document.createElement('canvas'); c.width = LW; c.height = LH; return c; };
+  sceneCache = { LH, T, bg: [mk(), mk()], table: mk() };
+  for (let wave = 0; wave < 2; wave++) drawStadium(sceneCache.bg[wave].getContext('2d'), T, wave);
+  drawTable(sceneCache.table.getContext('2d'), T);
+  return sceneCache;
+}
+
+function drawStadium(g, T, wave) {
   // --- fondo: pared, público y suelo (alturas relativas a HORIZON para que
   // el layout vertical simplemente muestre más pared arriba y más suelo abajo)
   const floorY = HORIZON + 34;
@@ -398,7 +413,6 @@ function draw(dt) {
     }
   }
   // público: bloques con "ola" de dos frames; muchas más gradas en vertical
-  const wave = Math.floor(crowdT * 2) % 2;
   const rows = LH === 216 ? 3 : Math.max(4, Math.min(16, Math.floor((HORIZON - 62) / 7)));
   const crowdTop = floorY - 2 - rows * 7;
   g.fillStyle = shade(T.wall, 0.7); g.fillRect(0, crowdTop - 3, LW, floorY - crowdTop + 3);
@@ -443,23 +457,9 @@ function draw(dt) {
     const tw2 = pixelTextWidth(txt, 2);
     drawPixelText(g, txt, LW / 2 - tw2 / 2, LH - 138, 2, shade(T.floor, 0.78));
   }
+}
 
-  if (!state) { blit(); return; }
-
-  const farSeat = viewFlip ? 0 : 1;
-  const nearSeat = 1 - farSeat;
-  const farP = state.paddles[farSeat];
-  const nearP = state.paddles[nearSeat];
-
-  // --- rival del fondo (pose según lo que le acaba de pasar)
-  const oppBase = project(farP.x, Physics.PADDLE_Y + 34, 0);
-  let oppPose = oppSprites.idle;
-  if (state.phase === 'over' && state.winner === nearSeat) oppPose = oppSprites.lose;
-  else if (nowT - oppMissT < 1.4) oppPose = oppSprites.miss;
-  else if (nowT - armHitT[farSeat] < 0.2) oppPose = oppSprites.swing;
-  const os = oppBase.s * 1.05;
-  g.drawImage(oppPose, Math.round(oppBase.x - 26 * os), Math.round(oppBase.y - 72 * os), Math.round(52 * os), Math.round(72 * os));
-
+function drawTable(g, T) {
   // --- mesa por scanlines (relleno por filas para bordes de píxel nítidos)
   const nl = project(-Physics.HALF_W, -Physics.HALF_L, 0);
   const nr = project(Physics.HALF_W, -Physics.HALF_L, 0);
@@ -503,6 +503,33 @@ function draw(dt) {
   g.globalAlpha = 1;
   g.fillStyle = '#f0f0f8';
   g.fillRect(Math.round(nlp.x), netTop, Math.round(nrp.x - nlp.x), 1); // cinta superior
+}
+
+function draw(dt) {
+  const scene = sceneCanvases();
+  const wave = Math.floor(crowdT * 2) % 2;
+  const g = lctx;
+  // El fondo es opaco a pantalla completa: este drawImage hace también de clear.
+  g.drawImage(scene.bg[wave], 0, 0);
+
+  if (!state) { blit(); return; }
+
+  const farSeat = viewFlip ? 0 : 1;
+  const nearSeat = 1 - farSeat;
+  const farP = state.paddles[farSeat];
+  const nearP = state.paddles[nearSeat];
+
+  // --- rival del fondo (pose según lo que le acaba de pasar)
+  const oppBase = project(farP.x, Physics.PADDLE_Y + 34, 0);
+  let oppPose = oppSprites.idle;
+  if (state.phase === 'over' && state.winner === nearSeat) oppPose = oppSprites.lose;
+  else if (nowT - oppMissT < 1.4) oppPose = oppSprites.miss;
+  else if (nowT - armHitT[farSeat] < 0.2) oppPose = oppSprites.swing;
+  const os = oppBase.s * 1.05;
+  g.drawImage(oppPose, Math.round(oppBase.x - 26 * os), Math.round(oppBase.y - 72 * os), Math.round(52 * os), Math.round(72 * os));
+
+  // --- mesa y red (cacheadas; van después del rival para taparle las piernas)
+  g.drawImage(scene.table, 0, 0);
 
   // --- juez en su mesita, a la izquierda de la red (sigue la bola)
   {
@@ -1347,8 +1374,11 @@ function frame(ts) {
     if (state.phase === 'serve' && !$('status').textContent) setStatus(serveHint());
   }
 
+  // En el lobby solo se anima el logo: la escena queda tapada por el overlay
+  // opaco y dibujarla igualmente saturaba el hilo principal en móviles
+  // modestos (el teclado del nombre se congelaba — mismo mal que el billar).
   if (!$('lobby').classList.contains('hidden')) drawLogo(nowT);
-  draw(dt);
+  else if (!document.hidden) draw(dt);
   requestAnimationFrame(frame);
 }
 
