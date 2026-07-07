@@ -1,0 +1,9 @@
+{
+  "appId": "com.guiateatro.quepingquepong",
+  "appName": "QuePing QuePong",
+  "webDir": "public",
+  "backgroundColor": "#141a24",
+  "server": {
+    "androidScheme": "https"
+  }
+}
