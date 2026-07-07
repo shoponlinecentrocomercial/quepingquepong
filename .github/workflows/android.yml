@@ -21,7 +21,7 @@ jobs:
       - name: Install Dependencies
         run: |
           npm install
-          npm install @capacitor/cli @capacitor/core @capacitor/android @capacitor-community/admob @capacitor/assets
+          npm install @capacitor/cli @capacitor/core @capacitor/android @capacitor/assets
 
       - name: Create www folder
         run: mkdir -p www && cp index.html www/ 2>/dev/null || true
@@ -44,16 +44,6 @@ jobs:
           sudo ln -s $ANDROID_HOME/build-tools/$ACTUAL_VERSION/zipalign /usr/local/lib/android/sdk/build-tools/29.0.3/zipalign
           sudo ln -s $ANDROID_HOME/build-tools/$ACTUAL_VERSION/lib /usr/local/lib/android/sdk/build-tools/29.0.3/lib
           sudo ln -s $ANDROID_HOME/build-tools/$ACTUAL_VERSION/apksigner /usr/local/lib/android/sdk/build-tools/29.0.3/apksigner
-
-      - name: Configure Android Manifest (AdMob & Permissions)
-        run: |
-          # Inyectar ID de AdMob
-          sed -i '/<\/application>/i <meta-data android:name="com.google.android.gms.ads.APPLICATION_ID" android:value="ca-app-pub-3940256099942544~3347511713"\/>' android/app/src/main/AndroidManifest.xml
-          # Inyectar Permisos de GPS y Sensores
-          #sed -i '/<manifest/a <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />' android/app/src/main/AndroidManifest.xml
-          #sed -i '/<manifest/a <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />' android/app/src/main/AndroidManifest.xml
-          #sed -i '/<manifest/a <uses-feature android:name="android.hardware.sensor.accelerometer" android:required="true" />' android/app/src/main/AndroidManifest.xml
-          #sed -i '/<manifest/a <uses-feature android:name="android.hardware.sensor.compass" android:required="true" />' android/app/src/main/AndroidManifest.xml
 
       - name: Build APK
         run: |
