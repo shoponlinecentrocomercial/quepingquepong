@@ -6,7 +6,7 @@
 // null: el cliente usa el mismo origen con ws:// o wss:// según el protocolo.
 //
 // Para la app móvil, apunta al servidor público, p. ej.:
-//   window.PINGPONG_SERVER_URL = 'wss://pingpong.ejemplo.com';
-//   window.PINGPONG_SHARE_URL  = 'https://pingpong.ejemplo.com';
-window.PINGPONG_SERVER_URL = null;
-window.PINGPONG_SHARE_URL = null;
+   window.PINGPONG_SERVER_URL = 'wss://tacobooks.com:3000';
+   window.PINGPONG_SHARE_URL  = 'https://tacobooks.com:3000';
+//window.PINGPONG_SERVER_URL = null;
+//window.PINGPONG_SHARE_URL = null;
